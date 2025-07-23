@@ -9,7 +9,9 @@ python3 -m verl.trainer.main_ppo \
     data.val_files=/llm_reco/dehua/data/Omni-MATH/test.parquet \
     data.train_batch_size=1024 \
     data.max_prompt_length=4096 \
-    data.max_response_length=8192 \
+    data.max_response_length=4096 \
+    actor_rollout_ref.rollout.max_model_len=8192 \
+    actor_rollout_ref.rollout.max_num_batched_tokens=8192 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     actor_rollout_ref.model.path=/mmu_mllm_hdd_2/madehua/model/DeepSeek-R1-Distill-Qwen-14B \
