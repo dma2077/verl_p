@@ -104,8 +104,10 @@ def default_compute_score(
     elif data_source in [
         "omnimath"
     ]:
-        from . import rlpt
-        res = rlpt.compute_score(solution_str, ground_truth)
+        from . import rpt
+        # 从extra_info中获取tokenizer
+        tokenizer = extra_info.get("tokenizer") if extra_info else None
+        res = rpt.compute_score(solution_str, ground_truth, tokenizer=tokenizer)
     else:
         raise NotImplementedError(f"Reward function is not implemented for {data_source=}")
 

@@ -80,6 +80,9 @@ class NaiveRewardManager:
             num_turns = data_item.non_tensor_batch.get("__num_turns__", None)
             extra_info["num_turns"] = num_turns
 
+            # 添加tokenizer到extra_info中
+            extra_info["tokenizer"] = self.tokenizer
+            
             score = self.compute_score(
                 data_source=data_source,
                 solution_str=response_str,
