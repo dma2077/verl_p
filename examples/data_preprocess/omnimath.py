@@ -28,48 +28,81 @@ from datasets import Dataset
 def extract_multiple_solutions_from_text(solution_text, num_solutions=5):
     """
     Extract multiple single words from solution text as potential solutions.
-    Returns a list of up to num_solutions single-word candidates.
+    Returns a list of (word, position) tuples sorted by position to ensure different question lengths.
     """
-    solutions = []
+    # Remove LaTeX formatting but keep structure for position tracking
+    solution_for_search = solution_text.lower()
     
-    # Remove LaTeX formatting and extract content
-    solution_clean = re.sub(r'\\[a-zA-Z]+', '', solution_text)
-    solution_clean = re.sub(r'[{}]', '', solution_clean)
+    # Find meaningful words with their positions
+    word_positions = []
     
-    # Split into words
-    words = solution_clean.split()
+    # Split into words and track positions
+    words = solution_text.split()
+    current_pos = 0
     
-    # Filter meaningful words (exclude common stop words and short words)
-    meaningful_words = []
     for word in words:
-        # Clean the word (remove punctuation)
-        clean_word = re.sub(r'[^\w]', '', word)
-        if (len(clean_word) > 2 and 
-            clean_word.lower() not in ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'must', 'shall'] and
-            clean_word not in meaningful_words):
-            meaningful_words.append(clean_word)
+        # Find the actual position in the original text
+        word_pos = solution_text.find(word, current_pos)
+        if word_pos != -1:
+            # Clean the word (remove punctuation)
+            clean_word = re.sub(r'[^\w]', '', word)
+            if (len(clean_word) > 2 and 
+                clean_word.lower() not in ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'must', 'shall']):
+                word_positions.append((clean_word, word_pos))
+            current_pos = word_pos + len(word)
     
-    # Add meaningful words to solutions
-    for word in meaningful_words:
-        if word not in solutions:
-            solutions.append(word)
-            if len(solutions) >= num_solutions:
-                break
+    # Remove duplicates while preserving order
+    unique_word_positions = []
+    seen_words = set()
+    for word, pos in word_positions:
+        if word not in seen_words:
+            unique_word_positions.append((word, pos))
+            seen_words.add(word)
+    
+    # Sort by position to ensure progressive questions
+    unique_word_positions.sort(key=lambda x: x[1])
+    
+    # Take the first num_solutions words
+    selected_words = [word for word, pos in unique_word_positions[:num_solutions]]
     
     # If we don't have enough solutions, pad with "answer"
-    while len(solutions) < num_solutions:
-        solutions.append("answer")
+    while len(selected_words) < num_solutions:
+        selected_words.append("answer")
     
-    return solutions[:num_solutions]
+    return selected_words[:num_solutions]
 
 
-def split_problem_solution(original_problem, original_solution, target_solution):
+def split_problem_solution(original_problem, original_solution, target_solution, solution_index):
     """
     Split the original problem and solution.
-    Combine original problem with the solution, and use target_solution as the answer.
+    For each target_solution (token), find its position in the original_solution,
+    and combine original_problem with the part of solution before that token.
+    Use solution_index to handle cases where the same token appears multiple times.
     """
-    # Simply combine original problem with the full solution
-    new_problem = original_problem + "\n\n" + original_solution
+    if target_solution and target_solution != "answer":
+        # Find the position of the target solution in the original solution
+        solution_lower = original_solution.lower()
+        target_solution_lower = target_solution.lower()
+        
+        # Try to find the exact position
+        pos = solution_lower.find(target_solution_lower)
+        if pos != -1:
+            # Take everything before the target solution
+            new_problem_part = original_solution[:pos].strip()
+        else:
+            # If exact match not found, split by solution_index
+            total_length = len(original_solution)
+            split_point = int((solution_index + 1) * total_length / 6)  # Divide into 6 parts
+            new_problem_part = original_solution[:split_point].strip()
+    else:
+        # For "answer" tokens, split by solution_index to create progressive questions
+        total_length = len(original_solution)
+        split_point = int((solution_index + 1) * total_length / 6)  # Divide into 6 parts
+        new_problem_part = original_solution[:split_point].strip()
+        target_solution = "answer"
+    
+    # Combine original problem with the solution part before the target token
+    new_problem = original_problem + "\n\n" + new_problem_part
     
     return new_problem, target_solution
 
@@ -122,7 +155,7 @@ def process_omnimath_data(input_file, test_size=200, num_solutions_per_item=5, s
         # Create samples for each solution
         for sol_idx, target_solution in enumerate(solutions):
             # Split problem and solution
-            new_problem, final_solution = split_problem_solution(original_problem, original_solution, target_solution)
+            new_problem, final_solution = split_problem_solution(original_problem, original_solution, target_solution, sol_idx)
             
             # Create new data structure
             processed_item = {
