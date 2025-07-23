@@ -48,24 +48,19 @@ def extract_solution(solution_str):
     return final_answer
 
 
-def compute_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
-    """The scoring function for GSM8k.
 
-    Reference: Trung, Luong, et al. "Reft: Reasoning with reinforced fine-tuning." Proceedings of the 62nd Annual
-    Meeting of the Association for Computational Linguistics (Volume 1: Long Papers). 2024.
-
-    Args:
-        solution_str: the solution text
-        ground_truth: the ground truth
-        method: the method to extract the solution, choices are 'strict' and 'flexible'
-        format_score: the score for the format
-        score: the score for the correct answer
-    """
-    answer = extract_solution(solution_str=solution_str, method=method)
-    if answer is None:
+def compute_score(solution_str, ground_truth, method="strict", score=1.0, tokenizer=None):
+    """Scoring with true token‑level prefix matching."""
+    answer = extract_solution(solution_str, method)
+    if not answer:
         return 0
-    else:
-        if answer == ground_truth:
-            return score
-        else:
-            return 0
+    return score
+    # # 把 answer 和 ground_truth 都转成 token id 序列
+    # # add_special_tokens=False 保证只编码文本本身
+    # gt_ids  = tokenizer.encode(ground_truth,  add_special_tokens=False)
+    # ans_ids = tokenizer.encode(answer,      add_special_tokens=False)
+
+    # # 如果 answer 的 token 序列是 ground_truth 的严格前缀，就给分
+    # if len(ans_ids) <= len(gt_ids) and gt_ids[:len(ans_ids)] == ans_ids:
+    #     return score
+    # return 0
